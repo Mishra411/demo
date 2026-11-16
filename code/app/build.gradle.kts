@@ -52,6 +52,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.compose.material.icons.core)
+    // Added for Part 4: more icons (map, tent, star, chat) and the OpenStreetMap
+    // view used for campsite locations and the map WOW features (no API key needed).
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     testImplementation(libs.junit)
 

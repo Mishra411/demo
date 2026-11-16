@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
  * @param controller waiting list controller.
  * @param drawnContent extra content shown after the draw; receives this
  * entrant's waiting list entry.
+ * @param entrantName this entrant's profile name, shown to the owner on the waiting list.
  */
 @Composable
 fun EntrantLotteryCard(
@@ -43,6 +44,7 @@ fun EntrantLotteryCard(
     deviceId: String,
     controller: WaitingListController,
     drawnContent: @Composable (WaitingListEntry?) -> Unit = {},
+    entrantName: String = "",
 ) {
     val scope = rememberCoroutineScope()
     val entries by remember(lottery?.id) {
@@ -71,7 +73,7 @@ fun EntrantLotteryCard(
             busy = true
             scope.launch {
                 message = try {
-                    when (controller.join(target, deviceId, "")) {
+                    when (controller.join(target, deviceId, entrantName)) {
                         JoinResult.JOINED -> "You joined the waiting list."
                         JoinResult.ALREADY_JOINED -> "You are already on the waiting list."
                         JoinResult.FULL -> "Sorry, the waiting list is full."
@@ -109,16 +111,22 @@ fun EntrantLotteryCard(
  * @param lotteries all lotteries.
  * @param deviceId this owner's ID.
  * @param onOpenWaitingList called with the lottery to open.
+ * @param onEdit called with an open lottery to update (US 02.04.06).
+ * @param onOpenSent opens the notifications this owner sent (US 02.10.02).
  */
 @Composable
 fun OwnerLotteriesRoute(
     lotteries: List<Lottery>,
     deviceId: String,
     onOpenWaitingList: (Lottery) -> Unit,
+    onEdit: ((Lottery) -> Unit)? = null,
+    onOpenSent: (() -> Unit)? = null,
 ) {
     OwnerLotteriesScreen(
         lotteries = WaitingListController.lotteriesOfOwner(lotteries, deviceId),
         onOpenWaitingList = onOpenWaitingList,
+        onEdit = onEdit,
+        onOpenSent = onOpenSent,
     )
 }
 

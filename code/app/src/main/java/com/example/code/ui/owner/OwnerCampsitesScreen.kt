@@ -4,6 +4,8 @@ package com.example.code.ui.owner
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,13 +13,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.example.code.model.Availability
+import com.example.code.ui.common.RemoteImage
 import com.example.code.model.Campsite
 
 /**
@@ -99,19 +106,36 @@ private fun OwnerCampsiteCard(campsite: Campsite, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                campsite.name,
-                style = MaterialTheme.typography.titleMedium,
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RemoteImage(
+                campsite.imageUrl,
+                contentDescription = null,
+                modifier = Modifier.size(88.dp).clip(MaterialTheme.shapes.medium),
             )
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    campsite.name,
+                    style = MaterialTheme.typography.titleMedium,
+                )
 
-            Text(campsite.location)
+                Text(campsite.location)
 
-            Text("Maximum occupancy: ${campsite.maxOccupancy}")
+                Text("Maximum occupancy: ${campsite.maxOccupancy}")
+
+                if (Availability.hasSchedule(campsite)) {
+                    Text(
+                        Availability.describe(campsite),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

@@ -6,6 +6,8 @@ import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -54,20 +57,34 @@ import kotlinx.coroutines.launch
  * and submitted as epoch milliseconds; campsite identity is never editable.
  * [onPublish] must return only after persistence succeeds. A failed save keeps
  * the form open with its values, while [onPublished] closes it on success.
+ *
+ * AI use: [initial] (update an open lottery, US 02.04.06) and [otherCampsites]
+ * (one lottery for several campsites, US 02.04.02) were added with Claude
+ * (Anthropic), Nov 2026; reviewed and tested by Aalok Mishra.
+ *
+ * @param initial the open lottery being updated, or null to create one.
+ * @param otherCampsites the owner's other campsites that can share this lottery.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreateLotteryScreen(
     campsite: Campsite,
     onPublish: suspend (Lottery) -> String,
     onPublished: () -> Unit,
     onCancel: () -> Unit,
+    initial: Lottery? = null,
+    otherCampsites: List<Campsite> = emptyList(),
 ) {
-    var registrationStart by rememberSaveable(campsite.id) { mutableStateOf<Long?>(null) }
-    var registrationEnd by rememberSaveable(campsite.id) { mutableStateOf<Long?>(null) }
-    var bookingStart by rememberSaveable(campsite.id) { mutableStateOf<Long?>(null) }
-    var bookingEnd by rememberSaveable(campsite.id) { mutableStateOf<Long?>(null) }
-    var winners by rememberSaveable(campsite.id) { mutableStateOf("1") }
-    var capacity by rememberSaveable(campsite.id) { mutableStateOf("") }
+    var registrationStart by rememberSaveable(campsite.id) { mutableStateOf(initial?.registrationStart) }
+    var registrationEnd by rememberSaveable(campsite.id) { mutableStateOf(initial?.registrationEnd) }
+    var bookingStart by rememberSaveable(campsite.id) { mutableStateOf(initial?.bookingStart) }
+    var bookingEnd by rememberSaveable(campsite.id) { mutableStateOf(initial?.bookingEnd) }
+    var winners by rememberSaveable(campsite.id) { mutableStateOf(initial?.winnerCount?.toString() ?: "1") }
+    var capacity by rememberSaveable(campsite.id) {
+        mutableStateOf(initial?.waitlistCapacity?.toString().orEmpty())
+    }
+    var extraIds by rememberSaveable(campsite.id) { mutableStateOf(initial?.extraCampsiteIds.orEmpty()) }
+    val editing = initial != null
     var error by rememberSaveable(campsite.id) { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -80,7 +97,7 @@ fun CreateLotteryScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Create lottery", style = MaterialTheme.typography.headlineSmall)
+        Text(if (editing) "Update lottery" else "Create lottery", style = MaterialTheme.typography.headlineSmall)
         Text(campsite.name, style = MaterialTheme.typography.titleMedium)
         Text("All dates and times use ${TimeZone.getDefault().id}.")
 
@@ -115,10 +132,27 @@ fun CreateLotteryScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        val choices = otherCampsites.filter { it.id != campsite.id && it.ownerId == campsite.ownerId }
+        if (choices.isNotEmpty()) {
+            Text("More campsites in this lottery (optional)", style = MaterialTheme.typography.titleMedium)
+            Text("Winners choose any campsite in the lottery when they reserve.")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                choices.forEach { other ->
+                    val selected = other.id in extraIds
+                    FilterChip(
+                        selected = selected,
+                        enabled = !busy,
+                        onClick = { extraIds = if (selected) extraIds - other.id else extraIds + other.id },
+                        label = { Text(other.name) },
+                    )
+                }
+            }
+        }
+
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (busy) {
             CircularProgressIndicator()
-            Text("Publishing lottery…")
+            Text(if (editing) "Saving lottery…" else "Publishing lottery…")
         }
         Button(
             enabled = !busy,
@@ -145,7 +179,24 @@ fun CreateLotteryScreen(
                         bookingEnd = requireNotNull(bookingEnd) { "Choose a booking end." },
                         winnerCount = winnerCount,
                         waitlistCapacity = cap,
-                    ).also(LotteryController::validateCreation)
+                        extraCampsiteIds = choices.filter { it.id in extraIds }.map { it.id },
+                        extraCampsiteNames = choices.filter { it.id in extraIds }.map { it.name },
+                    ).also {
+                        if (initial == null) {
+                            LotteryController.validateCreation(it)
+                        } else {
+                            LotteryController.validateUpdate(initial, initial.copy(
+                                registrationStart = it.registrationStart,
+                                registrationEnd = it.registrationEnd,
+                                bookingStart = it.bookingStart,
+                                bookingEnd = it.bookingEnd,
+                                winnerCount = it.winnerCount,
+                                waitlistCapacity = it.waitlistCapacity,
+                                extraCampsiteIds = it.extraCampsiteIds,
+                                extraCampsiteNames = it.extraCampsiteNames,
+                            ))
+                        }
+                    }
                 } catch (e: IllegalArgumentException) {
                     error = e.message
                     null
@@ -160,14 +211,14 @@ fun CreateLotteryScreen(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            error = "Could not publish lottery: ${e.message ?: "Please try again."}"
+                            error = "Could not ${if (editing) "save" else "publish"} lottery: ${e.message ?: "Please try again."}"
                         } finally {
                             busy = false
                         }
                     }
                 }
             },
-        ) { Text("Publish") }
+        ) { Text(if (editing) "Save changes" else "Publish") }
         TextButton(onClick = onCancel, enabled = !busy) { Text("Cancel") }
     }
 }

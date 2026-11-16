@@ -9,6 +9,7 @@ package com.example.code.ui.admin
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,17 +36,30 @@ import androidx.compose.ui.unit.dp
 import com.example.code.admin.AdminProfileController
 import com.example.code.admin.AdminProfilesState
 import com.example.code.admin.AdminRemovalResult
-import com.example.code.admin.FirebaseAdminAuthorization
+import com.example.code.admin.ProfileRoleAdminAuthorization
+import com.example.code.model.Campsite
 import com.example.code.admin.FirestoreAdminProfileRepository
 import kotlinx.coroutines.launch
 
-/** Observes authorized profiles and performs only explicitly confirmed removals. */
+/**
+ * Observes authorized profiles and performs only explicitly confirmed removals.
+ *
+ * AI use: [campsites] and the campsite owners list (US 03.07.01) were added
+ * with Claude (Anthropic), Nov 2026; reviewed and tested by Aalok Mishra.
+ *
+ * @param campsites every campsite, to list campsite owners; null hides that list.
+ */
 @Composable
 fun AdminProfileRemovalRoute(
     currentProfileId: String,
     controller: AdminProfileController = remember(currentProfileId) {
-        AdminProfileController(FirestoreAdminProfileRepository(), FirebaseAdminAuthorization(), currentProfileId)
+        AdminProfileController(
+            FirestoreAdminProfileRepository(),
+            ProfileRoleAdminAuthorization(currentProfileId),
+            currentProfileId,
+        )
     },
+    campsites: List<Campsite>? = null,
 ) {
     var state by remember(controller) { mutableStateOf(AdminProfilesState()) }
     var retry by remember { mutableStateOf(0) }
@@ -57,6 +71,36 @@ fun AdminProfileRemovalRoute(
     val scope = rememberCoroutineScope()
     LaunchedEffect(controller, retry) { controller.observe().collect { state = it } }
     val profiles = state.profiles.filterNot { it.id in removedIds }
+
+    var showOwners by rememberSaveable { mutableStateOf(false) }
+    if (showOwners && campsites != null && state.authorized) {
+        BackHandler { showOwners = false }
+        AdminOwnersScreen(
+            owners = ownerRows(profiles, campsites),
+            currentProfileId = currentProfileId,
+            busyId = busyId,
+            message = message,
+            onBack = { showOwners = false; message = null },
+            onConfirmRemove = { id ->
+                if (busyId == null) {
+                    busyId = id
+                    scope.launch {
+                        message = when (controller.removeOwner(id)) {
+                            AdminRemovalResult.REMOVED, AdminRemovalResult.ALREADY_REMOVED -> {
+                                removedIds = removedIds + id
+                                "Owner and their campsites removed."
+                            }
+                            AdminRemovalResult.DENIED -> "Administrator access is required to remove owners."
+                            AdminRemovalResult.INVALID -> "You cannot remove yourself or an invalid owner."
+                            AdminRemovalResult.FAILED -> "Could not remove the owner. Try again."
+                        }
+                        busyId = null
+                    }
+                }
+            },
+        )
+        return
+    }
 
     val opened = openedId
     if (opened != null) {
@@ -76,6 +120,7 @@ fun AdminProfileRemovalRoute(
         busyId = busyId,
         message = message,
         onProfileClick = { openedId = it },
+        onOpenOwners = if (campsites != null) ({ message = null; showOwners = true }) else null,
         onRefresh = { removedIds = emptySet(); message = null; retry++ },
         onConfirmRemove = { id ->
             if (busyId == null) {
@@ -108,6 +153,7 @@ fun AdminProfileRemovalScreen(
     onRefresh: () -> Unit,
     onConfirmRemove: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
+    onOpenOwners: (() -> Unit)? = null,
 ) {
     var pendingId by rememberSaveable { mutableStateOf<String?>(null) }
     val pending = state.profiles.firstOrNull { it.id == pendingId }
@@ -130,7 +176,10 @@ fun AdminProfileRemovalScreen(
             state.error != null -> { Text(state.error); Button(onClick = onRefresh) { Text("Retry") } }
             !state.authorized -> Text("Verified administrator access is required to manage profiles.")
             else -> {
-                TextButton(onClick = onRefresh, enabled = busyId == null) { Text("Refresh profiles") }
+                Row {
+                    TextButton(onClick = onRefresh, enabled = busyId == null) { Text("Refresh profiles") }
+                    if (onOpenOwners != null) TextButton(onClick = onOpenOwners) { Text("Campsite owners") }
+                }
                 if (state.profiles.isEmpty()) Text("No active profiles to review.")
                 else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.profiles, key = { it.id }) { profile ->

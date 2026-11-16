@@ -1,11 +1,14 @@
 /*
  * OwnerCampsiteDetailsScreen.kt
  * Resolves owned campsite details and opens the existing lottery form or promotional QR view.
- * Known issues: uses the shared owner ID until profile identity integration is complete.
+ * The owner can also edit the campsite here (US 02.01.03).
+ * Known issues: none.
  */
 package com.example.code.ui.owner
 
+import android.net.Uri
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,6 +17,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.example.code.model.Campsite
 import com.example.code.model.Lottery
+import com.example.code.model.MapPoint
+import com.example.code.model.Reservation
 import com.example.code.model.ownedCampsites
 import com.example.code.ui.entrant.CampsiteDetailsDestination
 
@@ -40,12 +45,36 @@ fun OwnerCampsiteDetailsDestination(
      * Currently, there is a model class, controller, and a LOtteryRepository", 11-05-2026
      * */
     onPublishLottery: (suspend (Campsite, Lottery) -> String)? = null,
+    // AI use: the parameters below (edit campsite US 02.01.03, map, availability
+    // calendar, reviews) were added with Claude (Anthropic), Nov 2026.
+    onEditCampsite: ((Campsite, (String) -> Unit, () -> Unit) -> Unit)? = null,
+    onUploadPhoto: (suspend (Uri) -> String)? = null,
+    lotteries: List<Lottery> = emptyList(),
+    reservations: List<Reservation> = emptyList(),
+    map: (@Composable (MapPoint) -> Unit)? = null,
+    reviewsContent: @Composable () -> Unit = {},
 ) {
     val owned = ownedCampsites(campsites, ownerId)
     val campsite = owned.firstOrNull { it.id == campsiteId }
     var showingQr by rememberSaveable(campsiteId, ownerId) { mutableStateOf(false) }
     var creating by rememberSaveable(campsiteId, ownerId) { mutableStateOf(false) }
     var published by rememberSaveable(campsiteId, ownerId) { mutableStateOf(false) }
+    var editing by rememberSaveable(campsiteId, ownerId) { mutableStateOf(false) }
+    var saved by rememberSaveable(campsiteId, ownerId) { mutableStateOf(false) }
+    if (editing && campsite != null && onEditCampsite != null) {
+        RegisterCampsiteScreen(
+            onRegister = { edited, showError ->
+                onEditCampsite(edited, showError) {
+                    editing = false
+                    saved = true
+                }
+            },
+            onBack = { editing = false },
+            initial = campsite,
+            onUploadPhoto = onUploadPhoto,
+        )
+        return
+    }
     if (showingQr && campsite != null && !isLoading && errorMessage == null) {
         CampsiteQrScreen(campsite, ownerId, onBack = { showingQr = false })
         return
@@ -59,6 +88,7 @@ fun OwnerCampsiteDetailsDestination(
                 published = true
             },
             onCancel = { creating = false },
+            otherCampsites = owned,
         )
         return
     }
@@ -69,7 +99,15 @@ fun OwnerCampsiteDetailsDestination(
         errorMessage = errorMessage,
         onRetry = onRetry,
         onBack = onBack,
+        lotteries = lotteries,
+        reservations = reservations,
+        map = map,
+        reviewsContent = reviewsContent,
         lotteryContent = {
+            if (saved) Text("Changes saved.")
+            if (campsite != null && onEditCampsite != null) {
+                OutlinedButton(onClick = { saved = false; editing = true }) { Text("Edit campsite") }
+            }
             if (campsite != null) {
                 Button(onClick = { showingQr = true }) { Text("Show promotional QR code") }
             }
