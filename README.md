@@ -175,6 +175,27 @@ All changes were reviewed, run and tested by me before committing.
 
 "Help me resolve this merge conflict and keep both changes." prompt. Claude, model Claude Opus 5.5, Anthropic, 6 Nov. 2026, claude.ai/code. (10%)
 
+## AI Tool Use Disclosure (Part 4)
+
+**AI tool used:** Claude (Anthropic), models Claude Fable 5.2 and Claude Opus 5.5, through claude.ai/code, 6–16 Nov. 2026.
+
+**What it was used for (Aalok Mishra's stories, about 80% AI-written):**
+- Code for US 01.03.01 (not-selected notification), 01.04.01–01.04.03, 01.05.01–01.05.02, 01.06.02, 01.07.01–01.07.02, 01.08.01, 01.10.01, 01.11.01, 01.13.01, 02.01.03, 02.04.02, 02.04.06, 02.07.02, 02.07.03, 02.10.02, 02.11.01, 02.12.01, 03.03.01, 03.06.01, 03.07.01, 03.08.01, 03.11.01 and 03.12.01.
+- The required features: availability schedule with a calendar (first come, first served days), map location, image upload, price, rules and cancellation policy.
+- The WOW features: map view within a radius of the device, reservation map, match score, featured carousel, advanced reviews (reply threads and reactions), accessibility mode (colour-blind colours, text size and component size) and owner–guest messaging.
+- The unit tests and intent tests for the above, the app theme and launcher icon, and the offline loading screen with Retry.
+
+Each changed file says in its header comment which parts were written with Claude. We reviewed, ran and tested all code before committing.
+
+"Use the latest model to meet all my app requirements and also include the WOW factors that they have asked for." prompt. Claude, model Claude Fable 5.2, Anthropic, 14 Nov. 2026, claude.ai/code. (60%)
+
+"Solve it user story by user story until all are completed, make the app more user friendly, and add unit and intent tests with realistic data." prompt. Claude, model Claude Fable 5.2, Anthropic, 6 Nov. 2026, claude.ai/code. (20%)
+
+**Third-party library:** osmdroid (OpenStreetMap maps, Apache 2.0) for the map screens; no API key is needed.
+
+### Firestore collections added in Part 4
+`messages`, `images`, and `campsites/{campsiteId}/reviews`. Notifications now also store `reservationId` and `read`; lotteries may store `extraCampsiteIds` and `extraCampsiteNames`; campsites store `availableFrom`, `availableTo`, `availableWeekdays` and `ratingCount`. Firestore security rules must allow these.
+
 ---
 
 *Project documentation is maintained collaboratively by the CMPUT 301 team.*

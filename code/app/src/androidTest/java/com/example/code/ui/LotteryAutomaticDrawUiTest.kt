@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import com.example.code.controller.DrawController
+import com.example.code.model.AppNotification
 import com.example.code.model.Lottery
 import com.example.code.model.WaitingListEntry
 import com.example.code.navigation.AutomaticDraw
@@ -61,10 +62,13 @@ class LotteryAutomaticDrawUiTest {
             assertEquals(2, entries.count { it.status == WaitingListEntry.STATUS_WON })
             assertEquals(1, entries.count { it.status == WaitingListEntry.STATUS_NOT_SELECTED })
             assertEquals(1, repository.completedDraws)
-            assertEquals(2, notifications.sent.size)
+            val won = notifications.sent.filter { it.type == AppNotification.TYPE_LOTTERY_WON }
+            assertEquals(2, won.size)
             val winnerIds = entries.filter { it.status == WaitingListEntry.STATUS_WON }
                 .map { it.entrantId }.toSet()
-            assertEquals(winnerIds, notifications.sent.map { it.recipientId }.toSet())
+            assertEquals(winnerIds, won.map { it.recipientId }.toSet())
+            // US 01.03.02: the entrant who was not drawn is told too.
+            assertEquals(1, notifications.sent.count { it.type == AppNotification.TYPE_LOTTERY_LOST })
             val myEntry = entries.first { it.entrantId == data.entrants.first().entrantId }
             feedback = if (myEntry.status == WaitingListEntry.STATUS_WON) {
                 "You won this lottery!"
