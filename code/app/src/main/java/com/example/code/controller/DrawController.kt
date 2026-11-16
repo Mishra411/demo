@@ -5,9 +5,9 @@
  * records the result and sends each winner an in-app notification.
  * There is no server, so any device with the app open runs the draw; a
  * Firestore transaction makes sure only one of them succeeds.
+ * Entrants who were not selected are told too (US 01.03.02).
  * Known issues: a lottery is drawn only when some device has the app open
- * after registration closes; entrants who were not selected get no
- * notification yet (US 01.03.02).
+ * after registration closes.
  */
 
 package com.example.code.controller
@@ -63,7 +63,18 @@ class DrawController(
                     campsiteName = lottery.campsiteName,
                     type = AppNotification.TYPE_LOTTERY_WON,
                     title = "You won ${lottery.campsiteName}!",
-                    message = "Open the campsite to accept your reservation.",
+                    message = "Open the campsite to choose your dates and reserve.",
+                    createdAt = now,
+                )
+            } + result.notSelected.map { entrant ->
+                // US 01.03.02: tell entrants who were not drawn.
+                AppNotification(
+                    recipientId = entrant.entrantId,
+                    lotteryId = lottery.id,
+                    campsiteName = lottery.campsiteName,
+                    type = AppNotification.TYPE_LOTTERY_LOST,
+                    title = "Not selected for ${lottery.campsiteName}",
+                    message = "Thanks for entering. You were not selected this time.",
                     createdAt = now,
                 )
             },

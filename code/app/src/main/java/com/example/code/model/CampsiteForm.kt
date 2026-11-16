@@ -58,3 +58,43 @@ fun campsiteFromForm(
         imageUrl = imageUrl.trim().ifBlank { null },
     )
 }
+
+/**
+ * Adds the optional details of the campsite form to [base]: price per
+ * night, rules, cancellation policy and the availability schedule.
+ * AI use: written with Claude (Anthropic), Nov 2026; reviewed and tested by Aalok Mishra.
+ *
+ * @param price price per night in CAD, or blank for none
+ * @param availableFrom first available date as YYYY-MM-DD, or blank
+ * @param availableTo last available date as YYYY-MM-DD, or blank
+ * @param weekdays weekdays open inside those dates (1 = Sunday to 7 = Saturday); empty means every day
+ * @return [base] with the details filled in
+ * @throws IllegalArgumentException with a message for the owner if a value is not valid
+ */
+fun campsiteDetailsFromForm(
+    base: Campsite,
+    price: String,
+    rules: String,
+    cancellationPolicy: String,
+    availableFrom: String,
+    availableTo: String,
+    weekdays: List<Int>,
+): Campsite {
+    val priceValue = if (price.isBlank()) {
+        null
+    } else {
+        val number = price.trim().removePrefix("$").toDoubleOrNull()
+        require(number != null && number.isFinite() && number >= 0) { "Enter the price per night as a number, like 65." }
+        number
+    }
+    val (from, to) = Availability.validate(availableFrom, availableTo, weekdays)
+    return base.copy(
+        price = priceValue,
+        currency = if (priceValue == null) null else "CAD",
+        rules = rules.trim(),
+        cancellationPolicy = cancellationPolicy.trim(),
+        availableFrom = from,
+        availableTo = to,
+        availableWeekdays = if (from.isEmpty()) emptyList() else weekdays.distinct().sorted(),
+    )
+}

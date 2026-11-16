@@ -17,10 +17,12 @@ package com.example.code.model
  * @property senderId device ID of the sender, or empty if the system sent it.
  * @property lotteryId lottery the notification is about.
  * @property campsiteName campsite name, for display.
- * @property type [TYPE_WAITLIST_MESSAGE] or [TYPE_LOTTERY_WON].
+ * @property type one of the TYPE constants, e.g. [TYPE_LOTTERY_WON].
  * @property title short heading.
  * @property message body text.
  * @property createdAt time sent, in milliseconds since the epoch.
+ * @property reservationId reservation the notification is about, if any.
+ * @property read true once the recipient has seen it.
  */
 data class AppNotification(
     val id: String = "",
@@ -32,6 +34,8 @@ data class AppNotification(
     val title: String = "",
     val message: String = "",
     val createdAt: Long = 0L,
+    val reservationId: String = "",
+    val read: Boolean = false,
 ) {
     companion object {
         /** Message from a campsite owner to their waiting list (US 02.10.01). */
@@ -39,5 +43,23 @@ data class AppNotification(
 
         /** Entrant was drawn as a lottery winner (US 01.03.01). */
         const val TYPE_LOTTERY_WON = "LOTTERY_WON"
+
+        /** Entrant was not drawn (US 01.03.02). */
+        const val TYPE_LOTTERY_LOST = "LOTTERY_LOST"
+
+        /** Reservation confirmed (US 01.05.01, 01.05.02). */
+        const val TYPE_RESERVATION_CONFIRMED = "RESERVATION_CONFIRMED"
+
+        /** Reservation cancelled by the entrant (US 01.07.02). */
+        const val TYPE_RESERVATION_CANCELLED = "RESERVATION_CANCELLED"
+
+        /** Reservation rejected by the owner (US 02.08.01). */
+        const val TYPE_RESERVATION_REJECTED = "RESERVATION_REJECTED"
+
+        /** A winner declined; sent to the owner (US 01.04.03). */
+        const val TYPE_RESERVATION_DECLINED = "RESERVATION_DECLINED"
+
+        /** Message between an owner and a guest about a reservation (US 02.12.01). */
+        const val TYPE_DIRECT_MESSAGE = "DIRECT_MESSAGE"
     }
 }

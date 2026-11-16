@@ -8,6 +8,7 @@ package com.example.code.data
 
 import com.example.code.User
 import com.example.code.UserRole
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 
 /**
@@ -33,6 +34,13 @@ interface UserRepository {
      * Stores the current editable information for [user].
      */
     suspend fun updateUser(user: User)
+
+    /**
+     * Deletes the profile of [deviceId] (US 01.08.01).
+     */
+    suspend fun deleteUser(deviceId: String) {
+        throw UnsupportedOperationException("Deleting profiles is not supported here.")
+    }
 }
 
 /**
@@ -74,6 +82,11 @@ class FirestoreUserRepository(
             notificationsEnabled =
                 snapshot.getBoolean("notificationsEnabled") ?: true,
             roles = roles,
+            preferredTags =
+                (snapshot.get("preferredTags") as? List<*>)
+                    ?.filterIsInstance<String>()
+                    ?.toSet()
+                    .orEmpty(),
         )
     }
 
@@ -112,12 +125,28 @@ class FirestoreUserRepository(
                 "profilePhotoUrl" to user.profilePhotoUrl,
                 "notificationsEnabled" to user.notificationsEnabled,
                 "roles" to user.roles.map { it.name },
+                "preferredTags" to user.preferredTags.sorted(),
             )
 
         db.collection(USERS)
             .document(user.deviceId)
             .update(updates)
             .awaitResult()
+    }
+
+    // US 01.08.01: take the entrant off open waiting lists, then remove the profile.
+    override suspend fun deleteUser(deviceId: String) {
+        val lotteries = db.collection("lotteries").whereEqualTo("status", "OPEN").get().awaitResult()
+        lotteries.documents.forEach { lottery ->
+            val entry = lottery.reference.collection("waitingList").document(deviceId)
+            db.runTransaction { transaction ->
+                if (transaction.get(entry).exists()) {
+                    transaction.delete(entry)
+                    transaction.update(lottery.reference, "waitingListCount", FieldValue.increment(-1))
+                }
+            }.awaitResult()
+        }
+        db.collection(USERS).document(deviceId).delete().awaitResult()
     }
 
     companion object {

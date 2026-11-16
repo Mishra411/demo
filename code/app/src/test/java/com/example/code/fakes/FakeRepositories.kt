@@ -8,13 +8,18 @@
 package com.example.code.fakes
 
 import com.example.code.controller.LotteryController
+import com.example.code.controller.ReviewController
 import com.example.code.data.JoinResult
 import com.example.code.data.LotteryRepository
+import com.example.code.data.MessageRepository
 import com.example.code.data.NotificationRepository
 import com.example.code.data.ReservationRepository
+import com.example.code.data.ReviewRepository
 import com.example.code.model.AppNotification
 import com.example.code.model.Lottery
+import com.example.code.model.Message
 import com.example.code.model.Reservation
+import com.example.code.model.Review
 import com.example.code.model.WaitingListEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -126,5 +131,57 @@ class FakeReservationRepository(reservations: List<Reservation> = emptyList()) :
             rejectionReason = reason,
         )
         reservations.value = reservations.value + (reservationId to rejected)
+    }
+
+    override suspend fun cancel(reservationId: String, cancelledAt: Long) {
+        val reservation = reservations.value.getValue(reservationId)
+        reservations.value = reservations.value + (
+            reservationId to reservation.copy(status = Reservation.STATUS_CANCELLED, cancelledAt = cancelledAt)
+        )
+    }
+}
+
+/** [MessageRepository] that keeps messages in memory. */
+class FakeMessageRepository : MessageRepository {
+
+    /** Every message sent so far, oldest first. */
+    val sent = MutableStateFlow<List<Message>>(emptyList())
+
+    override suspend fun send(message: Message): String {
+        val id = "message-${sent.value.size + 1}"
+        sent.value = sent.value + message.copy(id = id)
+        return id
+    }
+
+    override fun conversation(reservationId: String): Flow<List<Message>> =
+        sent.map { all -> all.filter { it.reservationId == reservationId }.sortedBy { it.createdAt } }
+
+    override fun observeAll(): Flow<List<Message>> = sent
+}
+
+/** [ReviewRepository] that keeps reviews in memory. */
+class FakeReviewRepository : ReviewRepository {
+
+    /** Current reviews and replies by ID. */
+    val reviews = MutableStateFlow<Map<String, Review>>(emptyMap())
+
+    override fun observe(campsiteId: String): Flow<List<Review>> =
+        reviews.map { all -> all.values.filter { it.campsiteId == campsiteId } }
+
+    override suspend fun submit(review: Review) {
+        reviews.value = reviews.value + (review.id to review)
+    }
+
+    override suspend fun reply(reply: Review): String {
+        val id = "reply-${reviews.value.size + 1}"
+        reviews.value = reviews.value + (id to reply.copy(id = id))
+        return id
+    }
+
+    override suspend fun toggleReaction(campsiteId: String, reviewId: String, key: String, userId: String): Boolean {
+        val review = reviews.value.getValue(reviewId)
+        val (updated, reacted) = ReviewController.toggled(review.reactions, key, userId)
+        reviews.value = reviews.value + (reviewId to review.copy(reactions = updated))
+        return reacted
     }
 }

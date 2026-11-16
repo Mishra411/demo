@@ -3,9 +3,8 @@
  * Model of a campsite lottery: the data saved for it in Firestore
  * (lotteries/{id}). It holds data only; the rules (is registration open,
  * is there room) are in LotteryController.
- * Known issues: the owner's "Create lottery" form (US 02.04.01, 02.04.03-05,
- * 02.04.07) is a separate task; until it is merged, lotteries are added in
- * the Firestore console.
+ * One lottery can cover several campsites of the same owner (US 02.04.02).
+ * Known issues: none.
  */
 
 package com.example.code.model
@@ -25,6 +24,8 @@ package com.example.code.model
  * @property waitlistCapacity maximum entrants on the waiting list, or null for no limit.
  * @property waitingListCount entrants currently on the waiting list.
  * @property status [STATUS_OPEN] until the draw, then [STATUS_DRAWN].
+ * @property extraCampsiteIds other campsites in a multi-campsite lottery (US 02.04.02).
+ * @property extraCampsiteNames names of [extraCampsiteIds], in the same order.
  */
 data class Lottery(
     val id: String = "",
@@ -39,12 +40,9 @@ data class Lottery(
     val waitlistCapacity: Int? = null,
     val waitingListCount: Int = 0,
     val status: String = STATUS_OPEN,
-    val winnerIds: List<String> = emptyList(),
+    val extraCampsiteIds: List<String> = emptyList(),
+    val extraCampsiteNames: List<String> = emptyList(),
 ) {
-    /**
-     * Returns an updated lottery with randomly selected winners.
-     * If fewer than winnerCount entrants exist, selects all entrants.
-     */
 
     companion object {
         /** Registration has not ended or winners have not been drawn yet. */

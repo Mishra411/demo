@@ -105,7 +105,8 @@ class WaitingListController(
          * latest registration end, or null if the campsite has no lottery.
          */
         fun lotteryForCampsite(all: List<Lottery>, campsiteId: String): Lottery? {
-            val forCampsite = all.filter { it.campsiteId == campsiteId }
+            // US 02.04.02: a multi-campsite lottery shows on each of its campsites.
+            val forCampsite = all.filter { it.campsiteId == campsiteId || campsiteId in it.extraCampsiteIds }
             return forCampsite.firstOrNull { it.status == Lottery.STATUS_OPEN }
                 ?: forCampsite.maxByOrNull { it.registrationEnd }
         }

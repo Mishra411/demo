@@ -99,6 +99,26 @@ class CampsiteController : ViewModel() {
     }
 
     /**
+     * Saves an owner's edits to an existing campsite (US 02.01.03).
+     *
+     * Only the editable fields are written, so the owner and ratings are kept.
+     *
+     * @param campsite the edited campsite, with its id and owner
+     * @param onSuccess called once Firestore has saved the changes
+     * @param onFailure called with an error message if nothing was saved
+     */
+    fun updateCampsite(campsite: Campsite, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        if (campsite.id.isBlank() || campsite.ownerId.isBlank()) {
+            onFailure("This campsite can't be edited.")
+            return
+        }
+        campsiteCollection.document(campsite.id)
+            .update(campsiteEditToMap(campsite))
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onFailure("Could not save changes. Try again.") }
+    }
+
+    /**
      * Listens for campsite changes in Firestore and updates the app state.
      *
      * Existing test documents may use an older schema, so documents are
@@ -146,3 +166,25 @@ class CampsiteController : ViewModel() {
         }
     }
 }
+/**
+ * Fields an owner may change when editing a campsite (US 02.01.03). The
+ * owner and the rating are never overwritten.
+ * AI use: written with Claude (Anthropic), Nov 2026; reviewed and tested by Aalok Mishra.
+ */
+fun campsiteEditToMap(campsite: Campsite): Map<String, Any?> = mapOf(
+    "name" to campsite.name,
+    "location" to campsite.location,
+    "description" to campsite.description,
+    "maxOccupancy" to campsite.maxOccupancy,
+    "latitude" to campsite.latitude,
+    "longitude" to campsite.longitude,
+    "tags" to campsite.tags,
+    "imageUrl" to campsite.imageUrl,
+    "price" to campsite.price,
+    "currency" to campsite.currency,
+    "rules" to campsite.rules,
+    "cancellationPolicy" to campsite.cancellationPolicy,
+    "availableFrom" to campsite.availableFrom,
+    "availableTo" to campsite.availableTo,
+    "availableWeekdays" to campsite.availableWeekdays,
+)

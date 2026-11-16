@@ -63,7 +63,68 @@ object LotteryController {
         require(lottery.waitlistCapacity == null || lottery.waitlistCapacity >= lottery.winnerCount) {
             "Waiting-list capacity must be at least the number of winners, or left blank."
         }
+        // US 02.04.02: extra campsites must be named, distinct and not the main one.
+        require(lottery.extraCampsiteIds.size == lottery.extraCampsiteNames.size) {
+            "Each extra campsite needs a name."
+        }
+        require(
+            lottery.campsiteId !in lottery.extraCampsiteIds &&
+                lottery.extraCampsiteIds.toSet().size == lottery.extraCampsiteIds.size,
+        ) {
+            "Each campsite can only be listed once."
+        }
     }
+
+    /**
+     * Checks new settings for an open lottery (US 02.04.06): it must still
+     * be open, keep its campsite and owner, pass [validateCreation], and its
+     * capacity must fit everyone who already joined.
+     * AI use: this and the three functions below were written with Claude
+     * (Anthropic), Nov 2026; reviewed and tested by Aalok Mishra.
+     */
+    fun validateUpdate(current: Lottery, updated: Lottery) {
+        require(current.status == Lottery.STATUS_OPEN) {
+            "Winners were already drawn, so this lottery can no longer change."
+        }
+        require(current.ownerId == updated.ownerId && current.campsiteId == updated.campsiteId) {
+            "You can only update your own lottery."
+        }
+        validateCreation(updated.copy(campsiteName = current.campsiteName))
+        require(updated.waitlistCapacity == null || updated.waitlistCapacity >= current.waitingListCount) {
+            "${current.waitingListCount} entrants already joined, so capacity must be at least ${current.waitingListCount}."
+        }
+    }
+
+    /**
+     * Saves new [settings] for owner [ownerId]'s open [current] lottery (US 02.04.06).
+     */
+    suspend fun updateLottery(
+        repository: LotteryCreationRepository,
+        current: Lottery,
+        ownerId: String,
+        settings: Lottery,
+    ) {
+        require(ownerId.isNotBlank() && current.ownerId == ownerId) { "You can only update your own lottery." }
+        val updated = current.copy(
+            registrationStart = settings.registrationStart,
+            registrationEnd = settings.registrationEnd,
+            bookingStart = settings.bookingStart,
+            bookingEnd = settings.bookingEnd,
+            winnerCount = settings.winnerCount,
+            waitlistCapacity = settings.waitlistCapacity,
+            extraCampsiteIds = settings.extraCampsiteIds,
+            extraCampsiteNames = settings.extraCampsiteNames,
+        )
+        validateUpdate(current, updated)
+        repository.updateLottery(updated)
+    }
+
+    /**
+     * Every campsite in [lottery] as (ID, name), main campsite first (US 02.04.02).
+     */
+    fun campsitesOf(lottery: Lottery): List<Pair<String, String>> =
+        listOf(lottery.campsiteId to lottery.campsiteName) +
+            lottery.extraCampsiteIds.zip(lottery.extraCampsiteNames)
     /**
      * Returns true if entrants can join or leave the waiting list of
      * [lottery] at [now]: it is not drawn and [now] is inside the

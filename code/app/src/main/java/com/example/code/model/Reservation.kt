@@ -3,8 +3,9 @@
  * Model of a campsite reservation made by a lottery winner
  * (Firestore: reservations/{lotteryId}_{entrantId}). Data only; the rules
  * (is it active, its ID) are in ReservationController.
- * Known issues: the stay is the lottery's whole booking period; choosing
- * dates (US 01.04.01) comes after the halfway checkpoint.
+ * A winner picks the campsite and dates (US 01.04.01, 01.04.02), can decline
+ * (US 01.04.03) or cancel later (US 01.07.01).
+ * Known issues: none.
  */
 
 package com.example.code.model
@@ -23,9 +24,11 @@ package com.example.code.model
  * @property ownerId device ID of the campsite owner.
  * @property startDate first day of the stay.
  * @property endDate last day of the stay.
- * @property status [STATUS_ACTIVE] or [STATUS_REJECTED].
+ * @property status [STATUS_ACTIVE], [STATUS_REJECTED], [STATUS_CANCELLED] or [STATUS_DECLINED].
  * @property rejectionReason owner's reason, if rejected.
  * @property createdAt time the reservation was made.
+ * @property cancelledAt time the entrant cancelled, or 0 (US 01.07.01).
+ * @property rulesAcceptedAt time the entrant confirmed the campsite rules, or 0 (US 02.11.01).
  */
 data class Reservation(
     val id: String = "",
@@ -40,6 +43,8 @@ data class Reservation(
     val status: String = STATUS_ACTIVE,
     val rejectionReason: String = "",
     val createdAt: Long = 0L,
+    val cancelledAt: Long = 0L,
+    val rulesAcceptedAt: Long = 0L,
 ) {
 
     companion object {
@@ -48,5 +53,11 @@ data class Reservation(
 
         /** Owner rejected the reservation (US 02.08.01). */
         const val STATUS_REJECTED = "REJECTED"
+
+        /** Entrant cancelled the reservation (US 01.07.01). */
+        const val STATUS_CANCELLED = "CANCELLED"
+
+        /** Winner declined to reserve (US 01.04.03). */
+        const val STATUS_DECLINED = "DECLINED"
     }
 }

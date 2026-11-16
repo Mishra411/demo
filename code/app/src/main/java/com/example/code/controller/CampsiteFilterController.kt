@@ -5,7 +5,9 @@
  */
 package com.example.code.controller
 
+import com.example.code.model.Availability
 import com.example.code.model.Campsite
+import com.example.code.model.Days
 import com.example.code.model.CampsiteFilters
 import com.example.code.model.Lottery
 import com.example.code.model.Reservation
@@ -63,7 +65,8 @@ class CampsiteFilterController(private val zone: TimeZone = TimeZone.getDefault(
 
     /**
      * Returns sites satisfying every criterion using the current live records.
-     * A stay must fit one advertised period and not overlap an active reservation.
+     * A stay must fit one advertised lottery period or the owner's availability
+     * schedule, and not overlap an active reservation.
      * Rejected reservations do not block dates. Stored stay endpoints are inclusive.
      */
     fun apply(
@@ -76,15 +79,25 @@ class CampsiteFilterController(private val zone: TimeZone = TimeZone.getDefault(
         val availableIds = stay?.let {
             val start = day(it.start)
             val end = day(it.end)
-            lotteries.filter { lottery ->
+            val free = { campsiteId: String ->
+                reservations.none { booking ->
+                    booking.campsiteId == campsiteId &&
+                        booking.status == Reservation.STATUS_ACTIVE &&
+                        day(booking.startDate) <= end && day(booking.endDate) >= start
+                }
+            }
+            val byLottery = lotteries.filter { lottery ->
                 lottery.bookingStart > 0 && lottery.bookingEnd >= lottery.bookingStart &&
                     day(lottery.bookingStart) <= start && day(lottery.bookingEnd) >= end &&
-                    reservations.none { booking ->
-                        booking.campsiteId == lottery.campsiteId &&
-                            booking.status == Reservation.STATUS_ACTIVE &&
-                            day(booking.startDate) <= end && day(booking.endDate) >= start
-                    }
-            }.map { lottery -> lottery.campsiteId }.toSet()
+                    free(lottery.campsiteId)
+            }.map { lottery -> lottery.campsiteId }
+            // Campsites whose owner set an availability schedule covering the whole stay.
+            val firstDay = Days.dayOf(it.start, zone)
+            val lastDay = Days.dayOf(it.end, zone)
+            val bySchedule = campsites.filter { campsite ->
+                Availability.covers(campsite, firstDay, lastDay) && free(campsite.id)
+            }.map { campsite -> campsite.id }
+            (byLottery + bySchedule).toSet()
         }
         return filterCampsites(campsites, CampsiteFilters(selection.location, selection.guests, availableIds))
     }

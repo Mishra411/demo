@@ -7,6 +7,7 @@ package com.example.code.admin
 
 import com.example.code.data.awaitResult
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -24,6 +25,31 @@ class FirebaseAdminAuthorization(
 ) : AdminAuthorization {
     override suspend fun isAdmin(): Boolean =
         auth.currentUser?.getIdToken(true)?.awaitResult()?.claims?.get("admin") == true
+}
+
+/**
+ * Accepts either the Firebase admin custom claim or the ADMIN role stored on
+ * this device's profile, so an administrator set up in Firestore can use the
+ * admin screens without the Firebase Admin SDK.
+ * AI use: written with Claude (Anthropic), Nov 2026; reviewed by Aalok Mishra.
+ *
+ * @param deviceId this device's profile ID.
+ * @param claim the custom-claim check tried first.
+ * @param roleLookup returns the role names stored on a profile.
+ */
+class ProfileRoleAdminAuthorization(
+    private val deviceId: String,
+    private val claim: AdminAuthorization = FirebaseAdminAuthorization(),
+    private val roleLookup: suspend (String) -> List<String> = { id ->
+        (FirebaseFirestore.getInstance().collection("users").document(id).get().awaitResult()
+            .get("roles") as? List<*>)?.filterIsInstance<String>().orEmpty()
+    },
+) : AdminAuthorization {
+    override suspend fun isAdmin(): Boolean {
+        val claimed = try { claim.isAdmin() } catch (_: Exception) { false }
+        if (claimed) return true
+        return deviceId.isNotBlank() && "ADMIN" in roleLookup(deviceId)
+    }
 }
 
 /**
@@ -62,6 +88,22 @@ class AdminProfileController(
     }.catch { failure ->
         if (failure is CancellationException) throw failure
         emit(AdminProfilesState(loading = false, error = "Could not load profiles or verify administrator access. Try again."))
+    }
+
+    /**
+     * Removes campsite owner [ownerId] and their campsites for violating
+     * policy (US 03.07.01), after a fresh authorization check.
+     */
+    suspend fun removeOwner(ownerId: String): AdminRemovalResult {
+        if (currentProfileId.isBlank() || ownerId.isBlank() || '/' in ownerId || ownerId == currentProfileId) return AdminRemovalResult.INVALID
+        return try {
+            if (!authorization.isAdmin()) AdminRemovalResult.DENIED
+            else { repository.removeOwner(ownerId); AdminRemovalResult.REMOVED }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            AdminRemovalResult.FAILED
+        }
     }
 
     /**

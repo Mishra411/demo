@@ -113,6 +113,18 @@ class FirestoreLotteryRepository(
         return ref.id
     }
 
+    // US 02.04.06: update an open lottery after rechecking its owner and status.
+    override suspend fun updateLottery(lottery: Lottery) {
+        val ref = lotteries.document(lottery.id)
+        db.runTransaction { transaction ->
+            val stored = transaction.get(ref)
+            require(stored.exists()) { "This lottery no longer exists." }
+            val current = lotteryFromMap(lottery.id, stored.data ?: emptyMap())
+            LotteryController.validateUpdate(current, lottery)
+            transaction.update(ref, lotteryUpdateToMap(lottery))
+        }.awaitResult()
+    }
+
     override fun observeLotteries(): Flow<List<Lottery>> = callbackFlow {
         val registration = lotteries.addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -246,6 +258,8 @@ fun lotteryFromMap(id: String, data: Map<String, Any?>): Lottery = Lottery(
     waitlistCapacity = (data["waitlistCapacity"] as? Number)?.toInt(),
     waitingListCount = (data["waitingListCount"] as? Number)?.toInt() ?: 0,
     status = data["status"] as? String ?: Lottery.STATUS_OPEN,
+    extraCampsiteIds = (data["extraCampsiteIds"] as? List<*>)?.filterIsInstance<String>().orEmpty(),
+    extraCampsiteNames = (data["extraCampsiteNames"] as? List<*>)?.filterIsInstance<String>().orEmpty(),
 )
 
 /** Builds a [WaitingListEntry] from Firestore document [data]. */

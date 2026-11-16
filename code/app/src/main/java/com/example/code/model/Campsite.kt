@@ -23,6 +23,12 @@ package com.example.code.model
  * @property currency optional currency code stored with the price.
  * @property rules campsite rules supplied by the owner.
  * @property cancellationPolicy cancellation terms supplied by the owner.
+ * @property ratingCount number of entrant ratings in [rating] (US 01.13.01).
+ * @property availableFrom first available date as "YYYY-MM-DD", or blank if the
+ * owner has not set an availability schedule.
+ * @property availableTo last available date as "YYYY-MM-DD", or blank.
+ * @property availableWeekdays weekdays open inside the schedule (1 = Sunday to
+ * 7 = Saturday); empty means every day.
  */
 data class Campsite(
     val id: String = "",
@@ -40,4 +46,8 @@ data class Campsite(
     val currency: String? = null,
     val rules: String = "",
     val cancellationPolicy: String = "",
+    val ratingCount: Int = 0,
+    val availableFrom: String = "",
+    val availableTo: String = "",
+    val availableWeekdays: List<Int> = emptyList(),
 )

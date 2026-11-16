@@ -29,6 +29,7 @@ enum class UserRole {
  * @property profilePhotoUrl optional reference to the user's profile image.
  * @property notificationsEnabled whether the user allows notifications.
  * @property roles roles associated with this user profile.
+ * @property preferredTags campsite tags the user likes, used to pick featured campsites.
  */
 class User(
     val deviceId: String,
@@ -38,6 +39,7 @@ class User(
     var profilePhotoUrl: String? = null,
     var notificationsEnabled: Boolean = true,
     val roles: Set<UserRole>,
+    var preferredTags: Set<String> = emptySet(),
 ) {
 
     /**

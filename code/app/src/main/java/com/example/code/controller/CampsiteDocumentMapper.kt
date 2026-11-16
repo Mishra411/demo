@@ -27,5 +27,10 @@ internal fun campsiteFromDocument(id: String, data: Map<String, Any?>): Campsite
         currency = data["currency"] as? String,
         rules = data["rules"] as? String ?: "",
         cancellationPolicy = data["cancellationPolicy"] as? String ?: "",
+        ratingCount = (data["ratingCount"] as? Number)?.toInt() ?: 0,
+        availableFrom = data["availableFrom"] as? String ?: "",
+        availableTo = data["availableTo"] as? String ?: "",
+        availableWeekdays = (data["availableWeekdays"] as? List<*>)
+            ?.mapNotNull { (it as? Number)?.toInt() }?.filter { it in 1..7 } ?: emptyList(),
     )
 }

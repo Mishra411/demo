@@ -2,6 +2,7 @@
  * ReservationRepository.kt
  * Reads and saves reservations (Firestore: reservations/{id}). The interface
  * lets controllers and tests use a fake instead of Firestore.
+ * Entrants cancel (US 01.07.01) and owners reject (US 02.08.01) here.
  * Known issues: all reservations are read and filtered on the device.
  */
 
@@ -29,6 +30,14 @@ interface ReservationRepository {
 
     /** Marks reservation [reservationId] as rejected with [reason]. */
     suspend fun reject(reservationId: String, reason: String)
+
+    /**
+     * Marks reservation [reservationId] as cancelled by the entrant at
+     * [cancelledAt] (US 01.07.01).
+     */
+    suspend fun cancel(reservationId: String, cancelledAt: Long) {
+        throw UnsupportedOperationException("Cancelling is not supported here.")
+    }
 }
 
 /** [ReservationRepository] backed by Cloud Firestore. */
@@ -70,6 +79,12 @@ class FirestoreReservationRepository(
             .awaitResult()
     }
 
+    override suspend fun cancel(reservationId: String, cancelledAt: Long) {
+        reservations.document(reservationId)
+            .update(mapOf("status" to Reservation.STATUS_CANCELLED, "cancelledAt" to cancelledAt))
+            .awaitResult()
+    }
+
     companion object {
         /** Name of the reservations collection. */
         const val RESERVATIONS = "reservations"
@@ -92,6 +107,8 @@ fun reservationFromMap(id: String, data: Map<String, Any?>): Reservation = Reser
     status = data["status"] as? String ?: Reservation.STATUS_ACTIVE,
     rejectionReason = data["rejectionReason"] as? String ?: "",
     createdAt = (data["createdAt"] as? Number)?.toLong() ?: 0L,
+    cancelledAt = (data["cancelledAt"] as? Number)?.toLong() ?: 0L,
+    rulesAcceptedAt = (data["rulesAcceptedAt"] as? Number)?.toLong() ?: 0L,
 )
 
 /** Converts [reservation] to the fields stored in Firestore. */
@@ -107,4 +124,6 @@ fun reservationToMap(reservation: Reservation): Map<String, Any> = mapOf(
     "status" to reservation.status,
     "rejectionReason" to reservation.rejectionReason,
     "createdAt" to reservation.createdAt,
+    "cancelledAt" to reservation.cancelledAt,
+    "rulesAcceptedAt" to reservation.rulesAcceptedAt,
 )

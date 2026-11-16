@@ -22,6 +22,15 @@ interface LotteryCreationRepository {
     /** Saves a new lottery and returns its generated document ID after success. */
     // US 02.04.01: Declare owner-side creation without adding a method to the existing LotteryRepository interface.
     suspend fun createLottery(lottery: Lottery): String
+
+    /**
+     * Saves new settings for an open lottery the owner already published
+     * (US 02.04.06). Implementations recheck that it is still open and owned.
+     * AI use: written with Claude (Anthropic), Nov 2026.
+     */
+    suspend fun updateLottery(lottery: Lottery) {
+        throw UnsupportedOperationException("Updating lotteries is not supported here.")
+    }
 }
 
 /** Exact creation schema expected by the waiting-list and reservation code. */
@@ -42,5 +51,26 @@ fun newLotteryToMap(lottery: Lottery): Map<String, Any> {
     ).apply {
         // Omission reads back as null (unlimited) in lotteryFromMap.
         lottery.waitlistCapacity?.let { put("waitlistCapacity", it) }
+        // US 02.04.02: only multi-campsite lotteries store the extra campsites.
+        if (lottery.extraCampsiteIds.isNotEmpty()) {
+            put("extraCampsiteIds", lottery.extraCampsiteIds)
+            put("extraCampsiteNames", lottery.extraCampsiteNames)
+        }
     }
 }
+
+/**
+ * Fields an owner may change on an open lottery (US 02.04.06). The campsite,
+ * owner, status and waiting list count are never overwritten.
+ * AI use: written with Claude (Anthropic), Nov 2026.
+ */
+fun lotteryUpdateToMap(lottery: Lottery): Map<String, Any?> = mapOf(
+    "registrationStart" to lottery.registrationStart,
+    "registrationEnd" to lottery.registrationEnd,
+    "bookingStart" to lottery.bookingStart,
+    "bookingEnd" to lottery.bookingEnd,
+    "winnerCount" to lottery.winnerCount,
+    "waitlistCapacity" to lottery.waitlistCapacity,
+    "extraCampsiteIds" to lottery.extraCampsiteIds,
+    "extraCampsiteNames" to lottery.extraCampsiteNames,
+)

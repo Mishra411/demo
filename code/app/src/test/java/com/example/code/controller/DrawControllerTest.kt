@@ -52,13 +52,26 @@ class DrawControllerTest {
         assertEquals(2, statuses[WaitingListEntry.STATUS_NOT_SELECTED])
     }
 
+    // US 01.03.02: entrants who were not drawn are told too.
+    @Test
+    fun notSelectedEntrantsAreNotified() = runBlocking {
+        val result = controller.drawIfDue(lottery())!!
+
+        val lost = notifications.sent.filter { it.type == AppNotification.TYPE_LOTTERY_LOST }
+        assertEquals(result.notSelected.map { it.entrantId }.toSet(), lost.map { it.recipientId }.toSet())
+        lost.forEach {
+            assertEquals("Not selected for Jasper Riverside", it.title)
+            assertEquals(lotteryId, it.lotteryId)
+        }
+    }
+
     @Test
     fun winnersAreNotified() = runBlocking {
         val result = controller.drawIfDue(lottery())!!
 
-        assertEquals(result.winners.map { it.entrantId }, notifications.sent.map { it.recipientId })
-        notifications.sent.forEach {
-            assertEquals(AppNotification.TYPE_LOTTERY_WON, it.type)
+        val won = notifications.sent.filter { it.type == AppNotification.TYPE_LOTTERY_WON }
+        assertEquals(result.winners.map { it.entrantId }, won.map { it.recipientId })
+        won.forEach {
             assertEquals("You won Jasper Riverside!", it.title)
             assertEquals(lotteryId, it.lotteryId)
             assertEquals(now, it.createdAt)
