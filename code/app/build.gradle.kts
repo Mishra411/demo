@@ -21,7 +21,18 @@ android {
     }
 
     buildTypes {
+        // Debug builds use the Firebase Local Emulator Suite on this computer
+        // instead of the team's Firebase project when useFirebaseEmulator=true
+        // in gradle.properties, so local testing never changes shared data.
+        debug {
+            val useEmulator = (project.findProperty("useFirebaseEmulator") as String?) == "true"
+            val host = (project.findProperty("firebaseEmulatorHost") as String?) ?: "10.0.2.2"
+            buildConfigField("boolean", "USE_FIREBASE_EMULATOR", useEmulator.toString())
+            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"$host\"")
+        }
         release {
+            buildConfigField("boolean", "USE_FIREBASE_EMULATOR", "false")
+            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"\"")
             optimization {
                 enable = false
             }
@@ -33,6 +44,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

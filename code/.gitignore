@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Firebase emulator
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+emulator-data/

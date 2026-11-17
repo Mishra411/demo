@@ -175,6 +175,18 @@ All changes were reviewed, run and tested by me before committing.
 
 "Help me resolve this merge conflict and keep both changes." prompt. Claude, model Claude Opus 5.5, Anthropic, 6 Nov. 2026, claude.ai/code. (10%)
 
+## Run locally without touching Firebase
+
+Debug builds use the Firebase Local Emulator Suite on your computer, so testing never changes the team's real Firestore data. Turn this off with `useFirebaseEmulator=false` in `code/gradle.properties`.
+
+1. Install Node.js and Java 17 or newer, then run `npm install -g firebase-tools`.
+2. From the `code` folder, start the emulators. Data is kept in `emulator-data` between runs:
+   `firebase emulators:start --project symbol-campsite --import=emulator-data --export-on-exit`
+3. Run the app from Android Studio on an Android emulator.
+4. Open http://localhost:4000 to see or edit the local data. To try admin mode, add `ADMIN` to `roles` in your `users` document.
+
+On a real phone connected by USB, run `adb reverse tcp:8080 tcp:8080` and `adb reverse tcp:9099 tcp:9099`, and set `firebaseEmulatorHost=127.0.0.1` in `code/gradle.properties`.
+
 ## AI Tool Use Disclosure (Part 4)
 
 **AI tool used:** Claude (Anthropic), models Claude Fable 5.2 and Claude Opus 5.5, through claude.ai/code, 6–16 Nov. 2026.

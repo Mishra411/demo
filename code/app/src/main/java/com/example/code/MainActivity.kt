@@ -23,11 +23,13 @@ import com.example.code.model.AccessibilitySettings
 import com.example.code.navigation.AppNavHost
 import com.example.code.ui.theme.CodeTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        useLocalEmulatorIfEnabled()
         val auth = FirebaseAuth.getInstance()
         if (auth.currentUser != null) {
             startApp()
@@ -58,6 +60,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Points Firestore and Auth at the Firebase emulators on the developer's
+     * computer when the debug build asks for it, so testing never changes the
+     * team's real data. Must run before Firestore or Auth is first used.
+     */
+    private fun useLocalEmulatorIfEnabled() {
+        if (!BuildConfig.USE_FIREBASE_EMULATOR || emulatorConnected) return
+        val host = BuildConfig.FIREBASE_EMULATOR_HOST
+        try {
+            FirebaseFirestore.getInstance().useEmulator(host, 8080)
+            FirebaseAuth.getInstance().useEmulator(host, 9099)
+            emulatorConnected = true
+            Log.i("MainActivity", "Using Firebase emulators at $host")
+        } catch (e: IllegalStateException) {
+            // Already connected earlier in this process.
+            emulatorConnected = true
+        }
+    }
+
     /** Reads the accessibility choices saved on this device. */
     private fun loadAccessibility(): AccessibilitySettings {
         val saved = getSharedPreferences(ACCESSIBILITY_PREFS, Context.MODE_PRIVATE)
@@ -78,6 +99,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
+        var emulatorConnected = false
         const val ACCESSIBILITY_PREFS = "accessibility"
         const val KEY_COLOR_BLIND = "colorBlind"
         const val KEY_TEXT_SCALE = "textScale"
