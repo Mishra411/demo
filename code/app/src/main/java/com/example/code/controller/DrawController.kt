@@ -18,6 +18,8 @@ import com.example.code.model.AppNotification
 import com.example.code.model.DrawResult
 import com.example.code.model.Lottery
 import com.example.code.model.WaitingListEntry
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 /**
@@ -47,6 +49,15 @@ class DrawController(
 
         val entries = lotteries.getWaitingList(lottery.id)
         val result = pickWinners(entries, lottery.winnerCount, random)
+        // Saving the draw changes the lottery list, which restarts the screen
+        // that called this. Finish saving and notifying even if that happens,
+        // so winners and other entrants are always told.
+        // AI use: fix found and written with Claude (Anthropic), Nov 2026.
+        return withContext(NonCancellable) { finishDraw(lottery, result, now) }
+    }
+
+    /** Saves the draw and notifies everyone; null if another device drew first. */
+    private suspend fun finishDraw(lottery: Lottery, result: DrawResult, now: Long): DrawResult? {
         val performed = lotteries.completeDraw(
             lotteryId = lottery.id,
             winnerIds = result.winners.map { it.entrantId },
