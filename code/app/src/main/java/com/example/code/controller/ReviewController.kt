@@ -10,6 +10,7 @@
 package com.example.code.controller
 
 import com.example.code.data.ReviewRepository
+import com.example.code.model.Reservation
 import com.example.code.model.Review
 import kotlinx.coroutines.flow.Flow
 
@@ -38,10 +39,20 @@ class ReviewController(
      * Saves [authorId]'s rating and comment for [campsiteId], replacing
      * their earlier one.
      *
-     * @throws IllegalArgumentException unless [stars] is 1 to 5 and the text fits.
+     * @param stayed true if the author has a finished stay at the campsite (US 01.13.02).
+     * @throws IllegalArgumentException unless [stars] is 1 to 5, the text fits and the author stayed.
      */
-    suspend fun submit(campsiteId: String, authorId: String, authorName: String, stars: Int, text: String): Review {
+    suspend fun submit(
+        campsiteId: String,
+        authorId: String,
+        authorName: String,
+        stars: Int,
+        text: String,
+        stayed: Boolean = true,
+    ): Review {
         require(campsiteId.isNotBlank() && authorId.isNotBlank()) { "Campsite and reviewer are required." }
+        // US 01.13.02: only entrants who have stayed can review.
+        require(stayed) { NEEDS_STAY }
         validateStars(stars)
         val review = Review(
             id = authorId,
@@ -86,7 +97,41 @@ class ReviewController(
         return reviews.toggleReaction(review.campsiteId, review.id, key, userId)
     }
 
+    /**
+     * Removes the star rating of [review] (US 03.09.01).
+     * AI use: written with Claude (Anthropic), Nov 2026.
+     */
+    suspend fun removeRating(review: Review) {
+        require(!review.isReply && review.stars in 1..5) { "This review has no rating to remove." }
+        reviews.removeRating(review.campsiteId, review.id)
+    }
+
+    /** Removes the text of [review] and its replies, or one reply (US 03.10.01). */
+    suspend fun removeReview(review: Review) {
+        require(review.isReply || review.text.isNotBlank()) { "This review has no text to remove." }
+        reviews.removeReview(review.campsiteId, review.id)
+    }
+
     companion object {
+        /** Shown to someone who can't review a campsite yet (US 01.13.02). */
+        const val NEEDS_STAY = "You can rate and review this campsite after your stay."
+
+        /**
+         * True if [userId] has a finished stay at [campsiteId] at [now], so
+         * they may review it (US 01.13.02).
+         */
+        fun canReview(reservations: List<Reservation>, campsiteId: String, userId: String, now: Long): Boolean =
+            ReservationController.pastForEntrant(reservations, userId, now).any { it.campsiteId == campsiteId }
+
+        /**
+         * Average and count after removing one rating of [stars] (US 03.09.01).
+         * Removing the last rating leaves no average.
+         */
+        fun removedAverage(average: Double?, count: Int, stars: Int): Pair<Double?, Int> {
+            if (average == null || count <= 1) return null to 0
+            return (average * count - stars) / (count - 1) to count - 1
+        }
+
         /** Longest review or reply allowed. */
         const val MAX_LENGTH = 600
 

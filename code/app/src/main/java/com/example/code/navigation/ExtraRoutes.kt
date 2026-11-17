@@ -134,6 +134,21 @@ fun ProfileRoute(
                 }
             }
         },
+        onRemovePhoto = {
+            scope.launch {
+                val old = user.profilePhotoUrl
+                if (userController.setProfilePhoto(null)) {
+                    // Also delete the uploaded file so it leaves the admin Images list.
+                    StoredImage.idFromRef(old)?.let { id ->
+                        try {
+                            images.remove(id)
+                        } catch (_: Exception) {
+                            // The photo is already gone from the profile.
+                        }
+                    }
+                }
+            }
+        },
         availableTags = Featured.allTags(campsites).take(12),
         onSetPreferredTags = { tags -> scope.launch { userController.setPreferredTags(tags) } },
         onOpenAccessibility = onOpenAccessibility,
@@ -145,7 +160,10 @@ fun ProfileRoute(
 /**
  * Ratings and reviews of one campsite (US 01.13.01 and the advanced review system).
  *
- * @param canReview false for the campsite's owner, who can reply and react only.
+ * @param canReview false for the campsite's owner, who can reply and react only,
+ * and for entrants who have not stayed there yet (US 01.13.02).
+ * @param notAllowedMessage shown instead of the review form when [canReview] is false.
+ * @param admin true in admin mode: ratings and reviews can be removed (US 03.09.01, 03.10.01).
  */
 @Composable
 fun ReviewsRoute(
@@ -154,6 +172,8 @@ fun ReviewsRoute(
     userName: String,
     controller: ReviewController,
     canReview: Boolean = true,
+    notAllowedMessage: String? = null,
+    admin: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val reviews by remember(campsiteId) {
@@ -188,6 +208,9 @@ fun ReviewsRoute(
         onReply = { review, text -> run(null) { controller.reply(review, deviceId, userName, text) } },
         onReact = { review, key -> run(null) { controller.react(review, key, deviceId) } },
         canReview = canReview,
+        notAllowedMessage = notAllowedMessage,
+        onRemoveRating = if (admin) ({ review -> run("Rating removed.") { controller.removeRating(review) } }) else null,
+        onRemoveReview = if (admin) ({ review -> run("Review removed.") { controller.removeReview(review) } }) else null,
     )
 }
 

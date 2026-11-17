@@ -268,4 +268,18 @@ class ReservationFlowTest {
     fun csvOfNothingIsJustTheHeader() {
         assertEquals(1, ReservationController.toCsv(emptyList()).trim().lines().size)
     }
+
+    // US 02.04.08: a stay at another owner's campsite in a shared lottery belongs to that owner.
+    @Test
+    fun reservationAtAnotherOwnersCampsiteGoesToThatOwner() {
+        val sharedLottery = drawn.copy(
+            shared = true,
+            extraCampsiteIds = listOf("camp-lakeside"),
+            extraCampsiteNames = listOf("Lakeside Pines"),
+            extraCampsiteOwnerIds = listOf("owner-device-b2c1"),
+        )
+        val reservation = reserve(lottery = sharedLottery, campsiteId = "camp-lakeside")!!
+        assertEquals("owner-device-b2c1", reservation.ownerId)
+        assertEquals("Lakeside Pines", reservation.campsiteName)
+    }
 }

@@ -1,6 +1,7 @@
 package com.example.code.data
 
 import com.example.code.controller.LotteryController
+import com.example.code.model.Campsite
 import com.example.code.model.Lottery
 
 
@@ -31,6 +32,15 @@ interface LotteryCreationRepository {
     suspend fun updateLottery(lottery: Lottery) {
         throw UnsupportedOperationException("Updating lotteries is not supported here.")
     }
+
+    /**
+     * Adds another owner's [campsite] to the shared lottery [lotteryId]
+     * (US 02.04.08). Implementations recheck that it can still be added.
+     * AI use: written with Claude (Anthropic), Nov 2026.
+     */
+    suspend fun addCampsiteToLottery(lotteryId: String, campsite: Campsite, ownerId: String) {
+        throw UnsupportedOperationException("Shared lotteries are not supported here.")
+    }
 }
 
 /** Exact creation schema expected by the waiting-list and reservation code. */
@@ -56,6 +66,9 @@ fun newLotteryToMap(lottery: Lottery): Map<String, Any> {
             put("extraCampsiteIds", lottery.extraCampsiteIds)
             put("extraCampsiteNames", lottery.extraCampsiteNames)
         }
+        // US 02.04.08: shared lotteries and their other owners.
+        if (lottery.extraCampsiteOwnerIds.isNotEmpty()) put("extraCampsiteOwnerIds", lottery.extraCampsiteOwnerIds)
+        if (lottery.shared) put("shared", true)
     }
 }
 
@@ -73,4 +86,6 @@ fun lotteryUpdateToMap(lottery: Lottery): Map<String, Any?> = mapOf(
     "waitlistCapacity" to lottery.waitlistCapacity,
     "extraCampsiteIds" to lottery.extraCampsiteIds,
     "extraCampsiteNames" to lottery.extraCampsiteNames,
+    "extraCampsiteOwnerIds" to lottery.extraCampsiteOwnerIds,
+    "shared" to lottery.shared,
 )

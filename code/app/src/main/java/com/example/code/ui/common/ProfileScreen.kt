@@ -3,7 +3,7 @@
  * Profile screen shared by all app modes.
  * Allows the user to edit personal information and switch between available modes.
  * Available modes are derived from the loaded user's assigned roles.
- * It also holds the user's settings: profile photo, camping interests, notification
+ * It also holds the user's settings: profile photo (add, change or remove, US 01.08.02), camping interests, notification
  * opt-out (US 01.10.01), hosting campsites, accessibility mode (WOW feature), the app
  * policy (US 01.11.01) and deleting the profile (US 01.08.01).
  * AI use: the settings below the mode list were written with Claude (Anthropic),
@@ -87,6 +87,7 @@ import com.example.code.navigation.AppMode
  * @param onSetEntering turns entering lotteries (entrant mode) on or off for an
  * administrator (US 03.11.01); null hides the switch.
  * @param onPhotoPicked called with a chosen profile photo; null hides the photo row.
+ * @param onRemovePhoto removes the profile photo (US 01.08.02); null hides the button.
  * @param availableTags campsite tags the user can mark as interests for the featured carousel.
  * @param onSetPreferredTags saves the user's interests; null hides them.
  * @param onOpenAccessibility opens accessibility mode; null hides the link.
@@ -108,6 +109,7 @@ fun ProfileScreen(
     onSetHosting: ((Boolean) -> Unit)? = null,
     onSetEntering: ((Boolean) -> Unit)? = null,
     onPhotoPicked: ((Uri) -> Unit)? = null,
+    onRemovePhoto: (() -> Unit)? = null,
     availableTags: List<String> = emptyList(),
     onSetPreferredTags: ((Set<String>) -> Unit)? = null,
     onOpenAccessibility: (() -> Unit)? = null,
@@ -247,6 +249,12 @@ fun ProfileScreen(
                         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                 ) { Text(if (user.profilePhotoUrl.isNullOrBlank()) "Add profile photo" else "Change profile photo") }
+                if (!user.profilePhotoUrl.isNullOrBlank() && onRemovePhoto != null) {
+                    TextButton(
+                        onClick = onRemovePhoto,
+                        modifier = Modifier.testTag("removePhoto"),
+                    ) { Text("Remove photo", color = MaterialTheme.colorScheme.error) }
+                }
             }
         }
 

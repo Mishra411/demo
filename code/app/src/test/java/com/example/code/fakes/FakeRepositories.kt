@@ -184,4 +184,30 @@ class FakeReviewRepository : ReviewRepository {
         reviews.value = reviews.value + (reviewId to review.copy(reactions = updated))
         return reacted
     }
+
+    /** Campsite averages kept by this fake: campsite ID to (average, count). */
+    val averages = MutableStateFlow<Map<String, Pair<Double?, Int>>>(emptyMap())
+
+    override suspend fun removeRating(campsiteId: String, reviewId: String) {
+        val review = reviews.value[reviewId] ?: return
+        if (review.stars !in 1..5) return
+        val (average, count) = averages.value[campsiteId] ?: (null to 0)
+        averages.value = averages.value + (campsiteId to ReviewController.removedAverage(average, count, review.stars))
+        reviews.value = if (review.text.isBlank()) {
+            reviews.value - reviewId
+        } else {
+            reviews.value + (reviewId to review.copy(stars = 0))
+        }
+    }
+
+    override suspend fun removeReview(campsiteId: String, reviewId: String) {
+        val review = reviews.value[reviewId] ?: return
+        reviews.value = when {
+            review.isReply -> reviews.value - reviewId
+            else -> {
+                val withoutReplies = reviews.value.filterValues { it.parentId != reviewId }
+                if (review.stars in 1..5) withoutReplies + (reviewId to review.copy(text = "")) else withoutReplies - reviewId
+            }
+        }
+    }
 }

@@ -17,8 +17,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.example.code.controller.LotteryController
 import com.example.code.controller.WaitingListController
+import com.example.code.data.LotteryCreationRepository
 import com.example.code.data.JoinResult
+import com.example.code.model.Campsite
 import com.example.code.model.Lottery
 import com.example.code.model.WaitingListEntry
 import com.example.code.ui.entrant.LotterySection
@@ -113,6 +116,8 @@ fun EntrantLotteryCard(
  * @param onOpenWaitingList called with the lottery to open.
  * @param onEdit called with an open lottery to update (US 02.04.06).
  * @param onOpenSent opens the notifications this owner sent (US 02.10.02).
+ * @param campsites all campsites, to offer this owner's free campsites for shared lotteries.
+ * @param repository saves a campsite added to a shared lottery (US 02.04.08); null hides that section.
  */
 @Composable
 fun OwnerLotteriesRoute(
@@ -121,12 +126,39 @@ fun OwnerLotteriesRoute(
     onOpenWaitingList: (Lottery) -> Unit,
     onEdit: ((Lottery) -> Unit)? = null,
     onOpenSent: (() -> Unit)? = null,
+    campsites: List<Campsite> = emptyList(),
+    repository: LotteryCreationRepository? = null,
 ) {
+    val scope = rememberCoroutineScope()
+    var joinMessage by remember { mutableStateOf<String?>(null) }
+    val now = System.currentTimeMillis()
+    // A campsite can only be in one open lottery at a time.
+    val busyCampsites = lotteries.filter { it.status == Lottery.STATUS_OPEN }
+        .flatMap { lottery -> LotteryController.campsitesOf(lottery).map { it.first } }
+        .toSet()
     OwnerLotteriesScreen(
         lotteries = WaitingListController.lotteriesOfOwner(lotteries, deviceId),
         onOpenWaitingList = onOpenWaitingList,
         onEdit = onEdit,
         onOpenSent = onOpenSent,
+        ownerId = deviceId,
+        joinable = lotteries.filter { LotteryController.canJoinShared(it, deviceId, now) },
+        myCampsites = campsites.filter { it.ownerId == deviceId && it.id !in busyCampsites },
+        onJoin = repository?.let { repo ->
+            { lottery, campsite ->
+                scope.launch {
+                    joinMessage = try {
+                        LotteryController.joinSharedLottery(repo, lottery, campsite, deviceId)
+                        "${campsite.name} was added to the shared lottery."
+                    } catch (e: IllegalArgumentException) {
+                        e.message
+                    } catch (e: Exception) {
+                        "Could not add the campsite: ${e.message}"
+                    }
+                }
+            }
+        },
+        joinMessage = joinMessage,
     )
 }
 

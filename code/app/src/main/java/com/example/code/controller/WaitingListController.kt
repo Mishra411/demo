@@ -113,6 +113,7 @@ class WaitingListController(
 
         /** Returns the lotteries created by owner [ownerId], newest first. */
         fun lotteriesOfOwner(all: List<Lottery>, ownerId: String): List<Lottery> =
-            all.filter { it.ownerId == ownerId }.sortedByDescending { it.registrationEnd }
+            // Includes shared lotteries the owner added a campsite to (US 02.04.08).
+            all.filter { ownerId in LotteryController.ownersOf(it) }.sortedByDescending { it.registrationEnd }
     }
 }

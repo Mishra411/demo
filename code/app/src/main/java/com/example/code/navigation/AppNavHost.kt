@@ -458,13 +458,19 @@ private fun ModeShell(
                         map = { point -> OsmMap(listOf(point), Modifier.fillMaxSize()) },
                         reviewsContent = {
                             if (campsiteId != null) {
+                                val owns = campsites.firstOrNull { it.id == campsiteId }?.ownerId == deviceId
+                                // US 01.13.02: entrants review a campsite after staying there;
+                                // owners cannot rate their own campsite.
+                                val stayed = ReviewController.canReview(
+                                    reservations, campsiteId, deviceId, System.currentTimeMillis(),
+                                )
                                 ReviewsRoute(
                                     campsiteId = campsiteId,
                                     deviceId = deviceId,
                                     userName = user.name,
                                     controller = services.reviews,
-                                    // Owners cannot rate their own campsite.
-                                    canReview = campsites.firstOrNull { it.id == campsiteId }?.ownerId != deviceId,
+                                    canReview = !owns && stayed,
+                                    notAllowedMessage = if (owns) null else ReviewController.NEEDS_STAY,
                                 )
                             }
                         },
@@ -511,10 +517,9 @@ private fun ModeShell(
                             },
                         ),
                 ) { detailsEntry ->
+                    val adminCampsiteId = detailsEntry.arguments?.getString("campsiteId")
                     CampsiteDetailsDestination(
-                        campsiteId =
-                            detailsEntry.arguments
-                                ?.getString("campsiteId"),
+                        campsiteId = adminCampsiteId,
                         campsites = campsites,
                         isLoading = isLoading,
                         errorMessage = loadError,
@@ -523,6 +528,19 @@ private fun ModeShell(
                         lotteries = lotteries,
                         reservations = reservations,
                         map = { point -> OsmMap(listOf(point), Modifier.fillMaxSize()) },
+                        // US 03.09.01, 03.10.01: administrators remove ratings and reviews here.
+                        reviewsContent = {
+                            if (adminCampsiteId != null) {
+                                ReviewsRoute(
+                                    campsiteId = adminCampsiteId,
+                                    deviceId = deviceId,
+                                    userName = user.name,
+                                    controller = services.reviews,
+                                    canReview = false,
+                                    admin = true,
+                                )
+                            }
+                        },
                     )
                 }
             }
@@ -766,6 +784,8 @@ private fun DestinationContent(
                 },
                 onEdit = { lottery -> navController.navigate("owner/lottery/${lottery.id}/edit") },
                 onOpenSent = { navController.navigate(OWNER_SENT_ROUTE) { launchSingleTop = true } },
+                campsites = campsites,
+                repository = services.lotteryCreation,
             )
 
         Destination.ENTRANT_NOTIFICATIONS ->

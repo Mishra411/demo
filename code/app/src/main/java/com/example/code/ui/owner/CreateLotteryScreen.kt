@@ -6,6 +6,12 @@ import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,6 +90,13 @@ fun CreateLotteryScreen(
         mutableStateOf(initial?.waitlistCapacity?.toString().orEmpty())
     }
     var extraIds by rememberSaveable(campsite.id) { mutableStateOf(initial?.extraCampsiteIds.orEmpty()) }
+    var shared by rememberSaveable(campsite.id) { mutableStateOf(initial?.shared ?: false) }
+    // Campsites other owners added to a shared lottery are kept on update (US 02.04.08).
+    val othersExtras = initial?.let { lottery ->
+        lottery.extraCampsiteIds.zip(lottery.extraCampsiteNames)
+            .map { (id, name) -> Triple(id, name, LotteryController.ownerOf(lottery, id)) }
+            .filter { it.third != campsite.ownerId }
+    }.orEmpty()
     val editing = initial != null
     var error by rememberSaveable(campsite.id) { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -149,6 +162,17 @@ fun CreateLotteryScreen(
             }
         }
 
+        Row(
+            Modifier.fillMaxWidth().toggleable(value = shared, enabled = !busy, role = Role.Checkbox) { shared = it },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = shared, onCheckedChange = null, modifier = Modifier.testTag("sharedLottery"))
+            Text("Let other campsite owners add their campsites", modifier = Modifier.padding(start = 8.dp))
+        }
+        if (othersExtras.isNotEmpty()) {
+            Text("Added by other owners: ${othersExtras.joinToString(", ") { it.second }}")
+        }
+
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (busy) {
             CircularProgressIndicator()
@@ -179,8 +203,14 @@ fun CreateLotteryScreen(
                         bookingEnd = requireNotNull(bookingEnd) { "Choose a booking end." },
                         winnerCount = winnerCount,
                         waitlistCapacity = cap,
-                        extraCampsiteIds = choices.filter { it.id in extraIds }.map { it.id },
-                        extraCampsiteNames = choices.filter { it.id in extraIds }.map { it.name },
+                        extraCampsiteIds = choices.filter { it.id in extraIds }.map { it.id } + othersExtras.map { it.first },
+                        extraCampsiteNames = choices.filter { it.id in extraIds }.map { it.name } + othersExtras.map { it.second },
+                        extraCampsiteOwnerIds = if (othersExtras.isEmpty()) {
+                            emptyList()
+                        } else {
+                            choices.filter { it.id in extraIds }.map { campsite.ownerId } + othersExtras.map { it.third }
+                        },
+                        shared = shared,
                     ).also {
                         if (initial == null) {
                             LotteryController.validateCreation(it)
@@ -194,6 +224,8 @@ fun CreateLotteryScreen(
                                 waitlistCapacity = it.waitlistCapacity,
                                 extraCampsiteIds = it.extraCampsiteIds,
                                 extraCampsiteNames = it.extraCampsiteNames,
+                                extraCampsiteOwnerIds = it.extraCampsiteOwnerIds,
+                                shared = it.shared,
                             ))
                         }
                     }

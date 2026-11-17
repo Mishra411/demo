@@ -26,6 +26,9 @@ package com.example.code.model
  * @property status [STATUS_OPEN] until the draw, then [STATUS_DRAWN].
  * @property extraCampsiteIds other campsites in a multi-campsite lottery (US 02.04.02).
  * @property extraCampsiteNames names of [extraCampsiteIds], in the same order.
+ * @property extraCampsiteOwnerIds owners of [extraCampsiteIds], in the same order; empty
+ * when every campsite belongs to [ownerId] (US 02.04.08).
+ * @property shared true if other campsite owners may add their campsites (US 02.04.08).
  */
 data class Lottery(
     val id: String = "",
@@ -42,6 +45,8 @@ data class Lottery(
     val status: String = STATUS_OPEN,
     val extraCampsiteIds: List<String> = emptyList(),
     val extraCampsiteNames: List<String> = emptyList(),
+    val extraCampsiteOwnerIds: List<String> = emptyList(),
+    val shared: Boolean = false,
 ) {
 
     companion object {

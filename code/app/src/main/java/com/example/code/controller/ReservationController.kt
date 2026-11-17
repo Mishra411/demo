@@ -130,7 +130,8 @@ class ReservationController(
             campsiteName = choice.second,
             entrantId = entry.entrantId,
             entrantName = entrantName.trim(),
-            ownerId = lottery.ownerId,
+            // In a shared lottery the chosen campsite may belong to another owner.
+            ownerId = LotteryController.ownerOf(lottery, campsiteId),
             startDate = start,
             endDate = end,
             createdAt = now,

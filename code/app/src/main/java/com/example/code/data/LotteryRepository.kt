@@ -11,6 +11,7 @@ package com.example.code.data
 
 import android.util.Log
 import com.example.code.controller.LotteryController
+import com.example.code.model.Campsite
 import com.example.code.model.Lottery
 import com.example.code.model.WaitingListEntry
 import com.google.firebase.firestore.FieldValue
@@ -122,6 +123,24 @@ class FirestoreLotteryRepository(
             val current = lotteryFromMap(lottery.id, stored.data ?: emptyMap())
             LotteryController.validateUpdate(current, lottery)
             transaction.update(ref, lotteryUpdateToMap(lottery))
+        }.awaitResult()
+    }
+
+    override suspend fun addCampsiteToLottery(lotteryId: String, campsite: Campsite, ownerId: String) {
+        val ref = lotteries.document(lotteryId)
+        db.runTransaction { transaction ->
+            val stored = transaction.get(ref)
+            require(stored.exists()) { "This lottery no longer exists." }
+            val current = lotteryFromMap(lotteryId, stored.data ?: emptyMap())
+            val updated = LotteryController.withSharedCampsite(current, campsite, ownerId, System.currentTimeMillis())
+            transaction.update(
+                ref,
+                mapOf(
+                    "extraCampsiteIds" to updated.extraCampsiteIds,
+                    "extraCampsiteNames" to updated.extraCampsiteNames,
+                    "extraCampsiteOwnerIds" to updated.extraCampsiteOwnerIds,
+                ),
+            )
         }.awaitResult()
     }
 
@@ -260,6 +279,8 @@ fun lotteryFromMap(id: String, data: Map<String, Any?>): Lottery = Lottery(
     status = data["status"] as? String ?: Lottery.STATUS_OPEN,
     extraCampsiteIds = (data["extraCampsiteIds"] as? List<*>)?.filterIsInstance<String>().orEmpty(),
     extraCampsiteNames = (data["extraCampsiteNames"] as? List<*>)?.filterIsInstance<String>().orEmpty(),
+    extraCampsiteOwnerIds = (data["extraCampsiteOwnerIds"] as? List<*>)?.filterIsInstance<String>().orEmpty(),
+    shared = data["shared"] as? Boolean ?: false,
 )
 
 /** Builds a [WaitingListEntry] from Firestore document [data]. */

@@ -38,6 +38,23 @@ interface ReviewRepository {
      * @return true if the user now reacts with [key].
      */
     suspend fun toggleReaction(campsiteId: String, reviewId: String, key: String, userId: String): Boolean
+
+    /**
+     * Removes the star rating of review [reviewId] and takes it out of the
+     * campsite's average (US 03.09.01). The comment stays.
+     * AI use: written with Claude (Anthropic), Nov 2026.
+     */
+    suspend fun removeRating(campsiteId: String, reviewId: String) {
+        throw UnsupportedOperationException("Removing ratings is not supported here.")
+    }
+
+    /**
+     * Removes the text of review [reviewId] and its replies, or a single
+     * reply (US 03.10.01). A star rating stays until it is removed too.
+     */
+    suspend fun removeReview(campsiteId: String, reviewId: String) {
+        throw UnsupportedOperationException("Removing reviews is not supported here.")
+    }
 }
 
 /** [ReviewRepository] backed by Cloud Firestore. */
@@ -98,6 +115,46 @@ class FirestoreReviewRepository(
             transaction.update(ref, "reactions", updated)
             reacted
         }.awaitResult()
+    }
+
+    override suspend fun removeRating(campsiteId: String, reviewId: String) {
+        val campsiteRef = db.collection("campsites").document(campsiteId)
+        val reviewRef = reviews(campsiteId).document(reviewId)
+        db.runTransaction { transaction ->
+            val review = transaction.get(reviewRef)
+            val campsite = transaction.get(campsiteRef)
+            val stars = review.getLong("stars")?.toInt() ?: 0
+            if (!review.exists() || stars !in 1..5) return@runTransaction
+            val average = (campsite.get("rating") as? Number)?.toDouble()
+            val count = (campsite.get("ratingCount") as? Number)?.toInt() ?: if (average != null) 1 else 0
+            val (newAverage, newCount) = ReviewController.removedAverage(average, count, stars)
+            // A rating with no comment leaves nothing to show, so it goes entirely.
+            if (review.getString("text").isNullOrBlank()) {
+                transaction.delete(reviewRef)
+            } else {
+                transaction.update(reviewRef, "stars", 0)
+            }
+            if (campsite.exists()) {
+                transaction.update(campsiteRef, mapOf("rating" to newAverage, "ratingCount" to newCount))
+            }
+        }.awaitResult()
+    }
+
+    override suspend fun removeReview(campsiteId: String, reviewId: String) {
+        val ref = reviews(campsiteId).document(reviewId)
+        val snapshot = ref.get().awaitResult()
+        if (!snapshot.exists()) return
+        val review = reviewFromMap(reviewId, campsiteId, snapshot.data.orEmpty())
+        val batch = db.batch()
+        if (review.isReply) {
+            batch.delete(ref)
+        } else {
+            reviews(campsiteId).whereEqualTo("parentId", reviewId).get().awaitResult()
+                .documents.forEach { batch.delete(it.reference) }
+            // Keep a star rating that has not been removed; it has its own story.
+            if (review.stars in 1..5) batch.update(ref, "text", "") else batch.delete(ref)
+        }
+        batch.commit().awaitResult()
     }
 
     companion object {

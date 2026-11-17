@@ -170,4 +170,92 @@ class LotteryUpdateTest {
         assertFalse(map.containsKey("waitingListCount"))
         assertFalse(map.containsKey("status"))
     }
+
+    // US 02.04.08: shared lotteries with other owners' campsites.
+    private val shared = open.copy(shared = true)
+    private val otherOwner = "owner-device-b2c1"
+    private val lakeside = Campsite(id = "camp-lakeside", ownerId = otherOwner, name = "Lakeside Pines")
+    private val beforeClose = open.registrationEnd - 1
+
+    @Test
+    fun anotherOwnerAddsTheirCampsiteToASharedLottery() = runBlocking {
+        val updated = LotteryController.withSharedCampsite(shared, lakeside, otherOwner, beforeClose)
+        assertEquals(listOf("camp-lakeside"), updated.extraCampsiteIds)
+        assertEquals(listOf("Lakeside Pines"), updated.extraCampsiteNames)
+        assertEquals(otherOwner, LotteryController.ownerOf(updated, "camp-lakeside"))
+        assertEquals(TestData.OWNER_ID, LotteryController.ownerOf(updated, updated.campsiteId))
+        assertEquals(listOf(TestData.OWNER_ID, otherOwner), LotteryController.ownersOf(updated))
+
+        val calls = mutableListOf<String>()
+        val repo = object : LotteryCreationRepository {
+            override suspend fun createLottery(lottery: Lottery) = ""
+            override suspend fun addCampsiteToLottery(lotteryId: String, campsite: Campsite, ownerId: String) {
+                calls += "$lotteryId/${campsite.id}/$ownerId"
+            }
+        }
+        LotteryController.joinSharedLottery(repo, shared, lakeside, otherOwner, beforeClose)
+        assertEquals(listOf("${shared.id}/camp-lakeside/$otherOwner"), calls)
+    }
+
+    @Test
+    fun ownerCannotJoinALotteryThatIsNotSharedOrClosedOrTheirOwnOrWithSomeoneElsesCampsite() {
+        fun rejected(lottery: Lottery, campsite: Campsite = lakeside, owner: String = otherOwner, at: Long = beforeClose) {
+            assertThrows(IllegalArgumentException::class.java) {
+                LotteryController.withSharedCampsite(lottery, campsite, owner, at)
+            }
+        }
+        rejected(open)
+        rejected(shared, at = shared.registrationEnd)
+        rejected(shared.copy(status = Lottery.STATUS_DRAWN))
+        rejected(shared, owner = "someone-else")
+        rejected(shared, campsite = lakeside.copy(id = shared.campsiteId))
+    }
+
+    @Test
+    fun onlyOtherOwnersSeeASharedLotteryAsJoinable() {
+        assertTrue(LotteryController.canJoinShared(shared, otherOwner, beforeClose))
+        assertFalse(LotteryController.canJoinShared(shared, TestData.OWNER_ID, beforeClose))
+        assertFalse(LotteryController.canJoinShared(open, otherOwner, beforeClose))
+        val joined = LotteryController.withSharedCampsite(shared, lakeside, otherOwner, beforeClose)
+        assertFalse(LotteryController.canJoinShared(joined, otherOwner, beforeClose))
+    }
+
+    @Test
+    fun sharedLotteryAppearsInEveryParticipatingOwnersLotteries() {
+        val joined = LotteryController.withSharedCampsite(shared, lakeside, otherOwner, beforeClose)
+        assertEquals(listOf(joined), WaitingListController.lotteriesOfOwner(listOf(joined), otherOwner))
+        assertEquals(listOf(joined), WaitingListController.lotteriesOfOwner(listOf(joined), TestData.OWNER_ID))
+        assertTrue(WaitingListController.lotteriesOfOwner(listOf(joined), "nobody").isEmpty())
+    }
+
+    @Test
+    fun olderExtrasBelongToTheCreatorWhenAnotherOwnerJoins() {
+        val withOwn = shared.copy(extraCampsiteIds = listOf("camp-banff-tunnel"), extraCampsiteNames = listOf("Banff"))
+        val joined = LotteryController.withSharedCampsite(withOwn, lakeside, otherOwner, beforeClose)
+        assertEquals(listOf(TestData.OWNER_ID, otherOwner), joined.extraCampsiteOwnerIds)
+        LotteryController.validateCreation(joined)
+    }
+
+    @Test
+    fun sharedFieldsSurviveSavingAndLoading() {
+        val joined = LotteryController.withSharedCampsite(shared, lakeside, otherOwner, beforeClose)
+        val loaded = lotteryFromMap(joined.id, newLotteryToMap(joined))
+        assertTrue(loaded.shared)
+        assertEquals(listOf(otherOwner), loaded.extraCampsiteOwnerIds)
+        assertFalse(newLotteryToMap(open).containsKey("shared"))
+        assertEquals(true, lotteryUpdateToMap(joined)["shared"])
+    }
+
+    @Test
+    fun ownerIdsMustMatchTheExtraCampsites() {
+        assertThrows(IllegalArgumentException::class.java) {
+            LotteryController.validateCreation(
+                shared.copy(
+                    extraCampsiteIds = listOf("camp-lakeside"),
+                    extraCampsiteNames = listOf("Lakeside Pines"),
+                    extraCampsiteOwnerIds = listOf(otherOwner, "extra"),
+                ),
+            )
+        }
+    }
 }
