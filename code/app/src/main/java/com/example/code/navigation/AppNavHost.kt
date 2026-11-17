@@ -325,11 +325,12 @@ private fun ModeShell(
             )
         },
         bottomBar = {
+            val selectedTab = tabFor(currentRoute, mode)
             BottomBar(
                 tabs = Destination.tabsFor(mode),
-                currentRoute = currentRoute,
+                currentRoute = selectedTab?.route ?: currentRoute,
                 onTabSelected = {
-                    navController.openTab(it, mode)
+                    navController.openTab(it, mode, reselected = it == selectedTab)
                 },
                 badges = mapOf(
                     Destination.ENTRANT_NOTIFICATIONS to Inbox.unread(entrantNotifications),
@@ -857,12 +858,41 @@ private fun DestinationContent(
 }
 
 /**
+ * The bottom-bar tab a screen belongs to, so the tab stays highlighted on
+ * screens opened from it, such as a campsite's details.
+ */
+private fun tabFor(route: String?, mode: AppMode): Destination? {
+    if (route == null) return null
+    val tabs = Destination.tabsFor(mode)
+    tabs.firstOrNull { it.route == route }?.let { return it }
+    val tab = when {
+        route == CAMPSITE_DETAILS_ROUTE -> Destination.ENTRANT_EXPLORE
+        route == ENTRANT_RESERVATION_MAP_ROUTE -> Destination.ENTRANT_RESERVATIONS
+        route == OWNER_CAMPSITE_DETAILS_ROUTE -> Destination.OWNER_CAMPSITES
+        route == OWNER_WAITING_LIST_ROUTE || route == OWNER_EDIT_LOTTERY_ROUTE || route == OWNER_SENT_ROUTE ->
+            Destination.OWNER_LOTTERIES
+        route == ADMIN_CAMPSITE_DETAILS_ROUTE -> Destination.ADMIN_CAMPSITES
+        route.endsWith("/accessibility") || route.endsWith("/policy") -> Destination.profileFor(mode)
+        else -> null
+    }
+    return tab?.takeIf { it in tabs }
+}
+
+/**
  * Opens [tab] of [mode] without stacking tabs on top of each other.
+ * Tapping the tab you are already in goes back to its first screen.
  */
 private fun NavHostController.openTab(
     tab: Destination,
     mode: AppMode,
+    reselected: Boolean = false,
 ) {
+    if (reselected) {
+        if (!popBackStack(tab.route, inclusive = false)) {
+            navigate(tab.route) { launchSingleTop = true }
+        }
+        return
+    }
     navigate(tab.route) {
         popUpTo(
             Destination.startFor(mode).route,

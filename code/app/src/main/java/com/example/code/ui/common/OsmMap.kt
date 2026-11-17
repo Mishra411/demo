@@ -29,13 +29,36 @@ import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import com.example.code.model.MapPoint
 import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import java.io.File
+
+
+/**
+ * Map tiles from CARTO's free OpenStreetMap basemap. The main OpenStreetMap
+ * tile servers refuse requests from most apps ("Access blocked"), so the app
+ * uses this server instead. Attribution is shown on the map.
+ */
+private val MAP_TILES: OnlineTileSourceBase = XYTileSource(
+    "CartoVoyager",
+    0,
+    19,
+    256,
+    ".png",
+    arrayOf(
+        "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://c.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://d.basemaps.cartocdn.com/rastertiles/voyager/",
+    ),
+    "© OpenStreetMap contributors © CARTO",
+)
 
 /**
  * Map with one pin per point.
@@ -57,12 +80,15 @@ fun OsmMap(
     val accent = MaterialTheme.colorScheme.primary.toArgb()
     val map = remember {
         Configuration.getInstance().apply {
-            userAgentValue = context.packageName
+            // OpenStreetMap blocks apps that don't identify themselves, so
+            // send a clear app name instead of the package name.
+            userAgentValue = "SymbolCamp/1.0 (CMPUT 301 student project; Android)"
             osmdroidBasePath = File(context.filesDir, "osmdroid")
             osmdroidTileCache = File(context.cacheDir, "osmdroid-tiles")
         }
         MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(MAP_TILES)
+            overlays.add(CopyrightOverlay(context))
             setMultiTouchControls(true)
             // Let the map pan inside a scrolling screen.
             setOnTouchListener { view, _ ->
@@ -83,6 +109,7 @@ fun OsmMap(
         modifier = modifier,
         update = { view ->
             view.overlays.clear()
+            view.overlays.add(CopyrightOverlay(context))
             if (center != null && radiusKm != null) {
                 view.overlays.add(
                     Polygon(view).apply {
