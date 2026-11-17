@@ -7,20 +7,25 @@
 
 package com.example.code.controller
 
+import com.example.code.data.LotteryRepository
+import com.example.code.data.NotificationRepository
 import com.example.code.fakes.FakeLotteryRepository
 import com.example.code.fakes.FakeNotificationRepository
 import com.example.code.fakes.TestData
 import com.example.code.model.AppNotification
 import com.example.code.model.Lottery
 import com.example.code.model.WaitingListEntry
+import kotlin.random.Random
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import kotlin.random.Random
 
 class DrawControllerTest {
 
@@ -105,5 +110,38 @@ class DrawControllerTest {
 
         assertEquals(1, controller.drawAllDue(lotteries.lotteries.value.values.toList()))
         assertEquals(Lottery.STATUS_OPEN, lotteries.lotteries.value.getValue(later.id).status)
+    }
+
+    // Saving the draw refreshes the lottery list, which restarts the screen's
+    // draw loop. The win and lose notifications must still be sent.
+    // AI use: test written with Claude (Anthropic), Nov 2026.
+    @Test
+    fun notificationsAreSentEvenIfTheCallerIsCancelledDuringTheDraw() = runBlocking {
+        lateinit var drawJob: Job
+        val cancellingLotteries = object : LotteryRepository by lotteries {
+            override suspend fun completeDraw(
+                lotteryId: String,
+                winnerIds: List<String>,
+                notSelectedIds: List<String>,
+                drawnAt: Long,
+            ): Boolean {
+                val saved = lotteries.completeDraw(lotteryId, winnerIds, notSelectedIds, drawnAt)
+                drawJob.cancel()
+                return saved
+            }
+        }
+        val slowNotifications = object : NotificationRepository by notifications {
+            override suspend fun sendAll(notifications: List<AppNotification>) {
+                yield()
+                this@DrawControllerTest.notifications.sendAll(notifications)
+            }
+        }
+        val drawing = DrawController(cancellingLotteries, slowNotifications, { now }, Random(2026))
+
+        drawJob = launch { drawing.drawIfDue(lottery()) }
+        drawJob.join()
+
+        assertEquals(Lottery.STATUS_DRAWN, lottery().status)
+        assertEquals(4, notifications.sent.size)
     }
 }
