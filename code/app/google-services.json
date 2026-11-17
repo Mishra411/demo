@@ -1,32 +1,13 @@
 {
   "project_info": {
-    "project_number": "537346299424",
-    "project_id": "symbol-campsite",
-    "storage_bucket": "symbol-campsite.firebasestorage.app"
+    "project_number": "79876993004",
+    "project_id": "symbol-camp-aalok",
+    "storage_bucket": "symbol-camp-aalok.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:537346299424:android:00c4a4db2aad4bb9dfce45",
-        "android_client_info": {
-          "package_name": "com.company.code"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDD1aLVlfAy7jLmyA9MxlbhhOi_xQBexH0"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:537346299424:android:e69df90f79b64aaedfce45",
+        "mobilesdk_app_id": "1:79876993004:android:9180c6c8de128acac95ac9",
         "android_client_info": {
           "package_name": "com.example.code"
         }
@@ -34,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDD1aLVlfAy7jLmyA9MxlbhhOi_xQBexH0"
+          "current_key": "AIzaSyCIDAj7-Y445-xv-ygYjnZ-GXNHqoV9aI4"
         }
       ],
       "services": {
